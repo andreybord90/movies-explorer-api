@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import User from '../models/user.js';
+import { generateToken } from '../middlewares/auth.js'
 import {
   ConflictError,
   NotFoundError,
@@ -7,15 +8,15 @@ import {
   UnauthorizedError,
 } from '../errors/index.js';
 
-const getUsers = async (req, res, next) => {
+const getUser = async (req, res, next) => {
   try {
-    const users = await User.find({});
-    if (users) {
-      res.status(200).send(users);
-    } else {
-      throw new NotFoundError('Пользователей не найдено');
-    }
-    return;
+    const { _id } = req.user;
+    await User.findById(_id)
+      .orFail(() => new NotFoundError('Пользователь не найден'))
+      .then((user) => {
+        const { name, email } = user;
+        res.status(200).send({ email, name });
+      });
   } catch (error) {
     next(error);
   }
@@ -25,10 +26,17 @@ const updateProfile = async (req, res, next) => {
     const { _id } = req.user;
 
     const { name, email } = req.body;
+
+    await User.findOne({ email })
+      .then((user) => {
+        if (user) {
+          throw new ConflictError('Пользователь с данным email существует');
+        }
+      });
     const user = await User.findByIdAndUpdate(
       _id,
       { name, email },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
     if (user) {
       res.status(200).send(user);
@@ -61,11 +69,10 @@ const createUser = async (req, res, next) => {
           return bcrypt.hash(password, 10);
         }
       })
-      .then((hash) => {        
+      .then((hash) => {
         return User.create({ name, password: hash, email });
       })
       .then(() => {
-
         res.status(201).send({ data: { name, email } });
       });
     return;
@@ -91,7 +98,6 @@ const login = async (req, res, next) => {
     if (!user) {
       throw new UnauthorizedError('Неправильные почта или пароль');
     }
-
     const compare = await bcrypt.compare(password, user.password);
 
     if (!compare) {
@@ -106,4 +112,4 @@ const login = async (req, res, next) => {
     next(new UnauthorizedError('Неправильные почта или пароль'));
   }
 };
-export { getUsers, updateProfile, createUser, login };
+export { getUser, updateProfile, createUser, login };

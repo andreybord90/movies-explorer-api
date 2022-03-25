@@ -31,7 +31,7 @@ const generateToken = (payload) => {
   const token = jwt.sign(
     payload,
     NODE_ENV === 'production' ? JWT_SECRET : 'God-is-Love',
-    { expiresIn: '7d' }
+    { expiresIn: '7d' },
   );
   return token;
 };
